@@ -1,0 +1,41 @@
+# 店小宝 MCP Server Nginx 反向代理示例（HTTPS + 备案域名）
+# 将 https://mcp.example.com/sse 转发到本机 8000 端口的 SSE 服务
+
+server {
+    listen 443 ssl http2;
+    server_name mcp.example.com;   # 改成你的备案域名
+
+    ssl_certificate     /etc/nginx/ssl/mcp.example.com.pem;      # SSL 证书
+    ssl_certificate_key /etc/nginx/ssl/mcp.example.com.key;      # 私钥
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    # SSE 需要关闭缓冲，保持长连接
+    location /sse {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    # 其他路径（MCP 调试接口）一并转发
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_buffering off;
+    }
+}
+
+server {
+    listen 80;
+    server_name mcp.example.com;
+    return 301 https://$host$request_uri;
+}
